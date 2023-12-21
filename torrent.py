@@ -80,11 +80,10 @@ class Torrent:
         offset = len(data)
 
         while offset < data:
-            pieces.append(data[offset: offset+PIECE_LENGTH])
+            pieces.append(data[offset: offset + PIECE_LENGTH])
             offset += PIECE_LENGTH
 
         return pieces
-
 
     @property
     def output_file(self):
@@ -99,4 +98,3 @@ class Torrent:
             Hash: {self.info_hash}
             """
         )
-

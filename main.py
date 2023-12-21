@@ -6,4 +6,4 @@ with open("C:\\Users\\User\\Downloads\\ubuntu-16.04-desktop-amd64.iso.torrent", 
     file = f.read()
     data = Decoder(file).decode()
 
-print(data[b'announce'])
+print(data)
