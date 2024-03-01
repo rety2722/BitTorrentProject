@@ -5,7 +5,7 @@ import socket
 from struct import unpack
 from urllib.parse import urlencode
 
-import bencoding
+from bencoding import Encoder, Decoder
 
 
 def _decode_port(port):
@@ -14,6 +14,17 @@ def _decode_port(port):
     """
     # Convert from C style big-endian encoded as unsigned short
     return unpack(">H", port)[0]
+
+
+def _calculate_peer_id():
+    """
+    Calculate and return unique peer id
+
+    The `peer id` is a 20 byte long identifier. This implementation use the
+    Azureus style `-PC1000-<random-characters>`.
+    :return: unique peer id
+    """
+    return '-PC0001-' + ''.join([str(random.randint(0, 9)) for _ in range(12)])
 
 
 class TrackerResponse:
@@ -37,7 +48,7 @@ class TrackerResponse:
     def interval(self) -> int:
         """
         :return: int
-            Interval in seconds that the client should wait between sending
+            interval in seconds that the client should wait between sending
             periodic requests to the tracker. Default value is 0
         """
         return self.response.get(b'interval', 0)
@@ -46,7 +57,7 @@ class TrackerResponse:
     def complete(self) -> int:
         """
         :return: int
-            Number of peers, obtaining entire file, or seeders
+            number of peers, obtaining entire file, or 'seeders'
         """
         return self.response.get(b'complete', 0)
 
@@ -54,7 +65,7 @@ class TrackerResponse:
     def incomplete(self) -> int:
         """
         :return: int
-            Number of peers, that are non-seeders, or 'leechers'
+            number of peers, that are non-seeders, or 'leechers'
         """
         return self.response.get(b'incomplete', 0)
 
@@ -96,3 +107,76 @@ class TrackerResponse:
             peers: {', '.join([x for (x, _) in self.peers])}
             """
         )
+
+
+class Tracker:
+    """
+    Represents the connection to a tracker for a given Torrent that is either
+    under download or seeding state.
+    """
+
+    def __init__(self, torrent):
+        """
+        :param torrent: torrent.Torrent instance
+        """
+        self.torrent = torrent
+        self.peer_id = _calculate_peer_id()
+        self.http_client = aiohttp.ClientSession()
+
+    async def connect(self,
+                      first: bool = None,
+                      uploaded: int = 0,
+                      downloaded: int = 0):
+        """
+        Makes announce call to the tracker to update with our statistics
+        as well as get a list of peers to connect to
+
+        If the call was successful, the list of peers will be updated as a result
+        of calling this function
+
+        :param first: Whether this is first announce call or not
+        :param uploaded: The total number of bytes uploaded
+        :param downloaded: The total number of bytes downloaded
+        """
+        params = {
+            'info_hash': self.torrent.info_hash,
+            'peer_id': self.peer_id,
+            'port': 6889,
+            'uploaded': uploaded,
+            'downloaded': downloaded,
+            'left': self.torrent.total_size - downloaded,
+            'compact': 1
+        }
+
+        if first:
+            params['event'] = 'started'
+
+        url = self.torrent.announce + '?' + urlencode(params)
+        logging.info('Connecting to tracker at: ' + url)
+
+        async with self.http_client.get(url) as response:
+            # unsuccessful connection
+            if not response.status == 200:
+                raise ConnectionError(f'Unable to connect to tracker, status code {response.status}')
+            data = await response.read()
+            self.raise_for_error(data)
+            return TrackerResponse(Decoder(data).decode())
+
+    def close(self):
+        self.http_client.close()
+
+    def raise_for_error(self, tracker_response):
+        """
+        A hacky fix to detect errors by tracker even when the response status
+        code is 200
+        :param tracker_response: response data
+        :raises: ConnectionError if 'failure' parameter is in response
+        """
+        try:
+            # error message will be utf-8 only
+            message = tracker_response.decode('utf-8')
+            if 'failure' in message:
+                raise ConnectionError(f'Unable to connect to tracker: {message}')
+        # successful response will contain non-unicode data
+        except UnicodeDecodeError:
+            pass
