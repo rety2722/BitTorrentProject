@@ -17,7 +17,7 @@ class Decoder:
     Methods
     -------
     decode()
-        Decodes bencoded data, is something like a main decode function
+        Decodes bencoded data, is a main decode function
     read_next()
         Reads next token
     read_by_length(length)

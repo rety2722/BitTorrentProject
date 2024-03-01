@@ -29,6 +29,7 @@ class Torrent:
         :return: None
         """
         if self.multi_file:
+            # TODO()
             pass
         self.files.append(
             TorrentFile(
@@ -39,7 +40,7 @@ class Torrent:
     def multi_file(self) -> bool:
         """
         :return: bool
-            If the file is a multi-file or not
+            if the file is a multi-file or not
         """
         return b'files' in self.meta_info[b'info']
 
@@ -66,6 +67,7 @@ class Torrent:
             Total size in bytes for all the files in torrent
         """
         if self.multi_file:
+            # TODO()
             pass
         return self.files[0].length
 
