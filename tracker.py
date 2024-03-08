@@ -5,7 +5,7 @@ import socket
 from struct import unpack
 from urllib.parse import urlencode
 
-from bencoding import Encoder, Decoder
+from bencoding import Decoder
 
 
 def _decode_port(port):
@@ -118,6 +118,7 @@ class Tracker:
     def __init__(self, torrent):
         """
         :param torrent: torrent.Torrent instance
+            representing a torrent file
         """
         self.torrent = torrent
         self.peer_id = _calculate_peer_id()
